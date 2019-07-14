@@ -307,4 +307,4 @@ Finally, add the previously created user *vfio* to the *input* group: `usermod -
   - [Trouble passing evdev to guest: Could not open /dev/input/by-id/...: Permission denied](https://www.reddit.com/r/VFIO/comments/7iqw6h/trouble_passing_evdev_to_guest_could_not_open/)
 - Level1Techs 
   - [Windows 10 1803 as guest with QEMU/KVM, BSOD under install](https://forum.level1techs.com/t/windows-10-1803-as-guest-with-qemu-kvm-bsod-under-install/127425/13)
-- Many more that I sadly can't remember
+- Many more I can't remember
