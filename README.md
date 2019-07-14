@@ -115,7 +115,68 @@ A couple of steps need to be done in the new configuration overview window.
   - Select both Guest GPU devices under PCI Host device
   - *Optional: Select a USB controller or HD audio device under PCI Host device*
   - *Optional: Select single USB controller*
-  - *Optional: Select additional storage and/or further devices*
+  - *Optional: Select additional storage and/or further devices. Just remember that you need some kind of input device to install windows if you aren't using evdev passthrough.*
 
-Hit *Begin Installation* once you configured the VM to your liking.
+Hit *Begin Installation* once you configured the VM to your liking. Kill the VM before installing windows since your new VM is not fully configured. 
 
+#### Advanced configuration with virsh
+The following steps are performed inside the VM's XML file. 
+Edit by executing `virsh edit VM_NAME`.
+##### XML Namespace
+Declare the XML namespace in the first line
+###### Before:
+```<domain type='kvm'>```
+###### After:
+```<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>```
+##### CPU configuration
+Change the CPU configuration to reflect the isolated cpu cores and number of cores of your VM. 
+###### Before:
+```
+<vcpu placement='static' current='1'>8</vcpu>
+```
+###### After:
+```
+<vcpu placement='static'>8</vcpu>
+  <cputune>
+    <vcpupin vcpu='0' cpuset='8'/>
+    <vcpupin vcpu='1' cpuset='9'/>
+    <vcpupin vcpu='2' cpuset='10'/>
+    <vcpupin vcpu='3' cpuset='11'/>
+    <vcpupin vcpu='4' cpuset='12'/>
+    <vcpupin vcpu='5' cpuset='13'/>
+    <vcpupin vcpu='6' cpuset='14'/>
+    <vcpupin vcpu='7' cpuset='15'/>
+    <emulatorpin cpuset='0-1'/>
+  </cputune>
+```
+#### Fix Error 43
+Add a fake vendor_id and hide KVM in the features section.
+###### Before:
+```
+<features>
+    <acpi/>
+    <apic/>
+    <hyperv>
+      <relaxed state='on'/>
+      <vapic state='on'/>
+      <spinlocks state='on' retries='8191'/>
+    </hyperv>
+    <vmport state='off'/>
+  </features>
+```
+###### After:
+```
+<features>
+    <acpi/>
+    <apic/>
+    <hyperv>
+      <relaxed state='on'/>
+      <vapic state='on'/>
+      <spinlocks state='on' retries='8191'/>
+      <vendor_id state='on' value='1234567890ab'/>
+    </hyperv>
+    <kvm>
+      <hidden state='on'/>
+    </kvm>
+  </features>
+```
