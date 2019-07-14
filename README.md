@@ -1,6 +1,31 @@
-# My VFIO Setup
-This document describes how to recreate my personal VFIO setup.
+# Yet Another VFIO Guide
 
+This guide describes how to create my personal VFIO setup.
+
+## Table of Contents
+- [Hardware](https://github.com/SMeatBoy/vfio/blob/master/README.md#hardware)
+- [System Configuration](https://github.com/SMeatBoy/vfio/blob/master/README.md#system-configuration)
+  - [Set Kernel Parameters](https://github.com/SMeatBoy/vfio/blob/master/README.md#set-kernel-parameters)
+  - [Blacklist GPU to prevent driver loading](https://github.com/SMeatBoy/vfio/blob/master/README.md#blacklist-gpu-to-prevent-driver-loading)
+  - [Load VFIO kernel modules](https://github.com/SMeatBoy/vfio/blob/master/README.md#load-vfio-kernel-modules)
+  - [Update GRUB and Initramfs](https://github.com/SMeatBoy/vfio/blob/master/README.md#update-grub-and-initramfs)
+- [Set up QEMU](https://github.com/SMeatBoy/vfio/blob/master/README.md#set-up-qemu)
+  - [Install virtualization packages](https://github.com/SMeatBoy/vfio/blob/master/README.md#install-virtualization-packages)
+  - [Set path of OVMF firmware](https://github.com/SMeatBoy/vfio/blob/master/README.md#set-path-of-ovmf-firmware)
+  - [*Optional: Change user for QEMU*](https://github.com/SMeatBoy/vfio/blob/master/README.md#optional-change-user-for-qemu-)
+- [Create and configure the VM](https://github.com/SMeatBoy/vfio/blob/master/README.md#create-and-configure-the-vm)
+  - [Create VM in virt-manager](https://github.com/SMeatBoy/vfio/blob/master/README.md#create-vm-in-virt-manager)
+    - [Initial VM creation](https://github.com/SMeatBoy/vfio/blob/master/README.md#initial-vm-creation)
+    - [Basic configuration](https://github.com/SMeatBoy/vfio/blob/master/README.md#basic-configuration)
+  - [Advanced configuration with virsh](https://github.com/SMeatBoy/vfio/blob/master/README.md#advanced-configuration-with-virsh)
+    - [XML Namespace](https://github.com/SMeatBoy/vfio/blob/master/README.md#xml-namespace)
+    - [CPU configuration](https://github.com/SMeatBoy/vfio/blob/master/README.md#cpu-configuration)
+    - [Fix Error 43](https://github.com/SMeatBoy/vfio/blob/master/README.md#fix-error-43)
+- [*Optional: Evdev Passthrough*](https://github.com/SMeatBoy/vfio/blob/master/README.md#optional-evdev-passthrough)
+  - [Finding the correct input devices](https://github.com/SMeatBoy/vfio/blob/master/README.md#finding-the-correct-input-devices)
+  - [Add devices to your VM](https://github.com/SMeatBoy/vfio/blob/master/README.md#add-devices-to-your-vm)
+  - [Add files to QEMU](https://github.com/SMeatBoy/vfio/blob/master/README.md#add-files-to-qemu)
+- [Credits/Sources](https://github.com/SMeatBoy/vfio/blob/master/README.md#creditssources)
 ## Hardware
 - CPU: Ryzen 7 1700
 - Motherboard: ASUS ROG STRIX X370-F GAMING
@@ -8,7 +33,7 @@ This document describes how to recreate my personal VFIO setup.
 - Host GPU: RX 570
 - Guest GPU: GTX 980 Ti
 
-## Prerequesites
+## System Configuration
 #### Set Kernel Parameters 
 Edit **/etc/default/grub**
 ###### Before:
@@ -72,7 +97,7 @@ nvram = [
 #   "/usr/share/AAVMF/AAVMF32_CODE.fd:/usr/share/AAVMF/AAVMF32_VARS.fd",
 #   "/usr/share/OVMF/OVMF_CODE.ms.fd:/usr/share/OVMF/OVMF_VARS.ms.fd"
 ```
-#### *Optional: Change user for QEMU *
+#### Optional: Change user for QEMU
 This is only needed if evdev passthrough will be used. 
 As I understand it is best practice to execute QEMU as a non-login user created for this purpose. One may also change this value to the own user or root if so preferred. 
 
@@ -91,7 +116,7 @@ user = vfio
 This can be split into two parts. In the first part a virtual machine will be created with virt-manager. The second part configures the VM to improve performance and (most importantly) work around the well-known *Error 43*.
 
 #### Create VM in virt-manager
-###### Initial VM creation
+##### Initial VM creation
 Open virt-manager and create a new virtual machine. A window should open. 
 - Step 1: Choose local install media
 - Step 2: Select you install media. You might have to create a storage pool first. In this case choose filesystem directory.
@@ -102,7 +127,7 @@ Open virt-manager and create a new virtual machine. A window should open.
   - specify a whole disk as storage location, e.g. /dev/sdb3
 - Step 5: **Important:** Tick *Customize configuration before install*
 
-###### Basic configuration
+##### Basic configuration
 A couple of steps need to be done in the new configuration overview window. 
 - Choose the correct firmware in the *Overview* tab. Switch from BIOS to UEFI. The UEFI entry should feature the previously specified nvram path. 
 - Change the CPU configuration in the *CPUs* tab. 
@@ -260,7 +285,7 @@ cgroup_device_acl = [
 ```
 Restart libvirtd with `systemctl restart libvirtd.service`.
 
-##### Add exceptions to AppArmor
+#### Add exceptions to AppArmor
 QEMU won't be able to access these devices if they aren't whitelisted. Therefore you have to add them as exception in **/etc/apparmor.d/abstractions/libvirt-qemu**. Add the following lines and restart AppArmor with `systemctl restart apparmor.service`:
 ```
   /dev/input/event2 rw,
