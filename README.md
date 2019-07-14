@@ -320,12 +320,72 @@ QEMU won't be able to access these devices if they aren't whitelisted. Therefore
 ```
 Finally, add the previously created user *vfio* to the *input* group: `usermod -a -G input vfio`
 
+## *Optional: Execute Scripts on VM Startup and Shutdown*
+It is possible to [hook scripts](https://passthroughpo.st/simple-per-vm-libvirt-hooks-with-the-vfio-tools-hook-helper/) to the startup and shutdown of your virtual machine. For example, I want to disconnect my second screen from gnome and start synergy. 
+#### Setup
+Execute the following:
+```
+$ sudo mkdir -p /etc/libvirt/hooks
+$ sudo wget 'https://raw.githubusercontent.com/PassthroughPOST/VFIO-Tools/master/libvirt_hooks/qemu' -O /etc/libvirt/hooks/qemu 
+$ sudo chmod +x /etc/libvirt/hooks/qemu
+$ sudo systemctl restart libvirtd.service
+```
+### Exemplary Hooks
+For more details look at the tutorial linked above. 
+Examples: 
+
+**/etc/libvirt/hooks/qemu.d/win10/started/begin/startup.sh**
+```
+#!/bin/bash
+su - bastian -c "DISPLAY=:0.0 xrandr --output HDMI-A-1 --off"
+systemctl start synergy@bastian.service
+```
+**/etc/libvirt/hooks/qemu.d/win10/stopped/end/shutdown.sh**
+```
+#!/bin/bash
+su - bastian -c "xrandr --output DisplayPort-1 --auto --output HDMI-A-1 --auto --right-of DisplayPort-1"
+systemctl stop synergy@bastian.service
+```
+## *Optional: Add Synergy as Systemd Service*
+To create a [systemd service for Synergy server](https://jackiechen.org/2014/10/24/configure-synergy-as-systemd-service/), create **/lib/systemd/system/synergy@.service** with the following content:
+```
+[Unit]
+Description=Synergy for sharing mouse and keyboard
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/synergys -f -n H440-Linux -c /etc/synergy.conf -a 192.168.122.1:24800 -l /var/log/synergy.log
+User=%i
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## *Optional: Configure X and Gnome*
+
+#### Avoid Login Loop
+I have to reconfigure X after starting the VM for the first time. Otherwise I am stuck in a login loop after rebooting Ubuntu. I guess that X wants to talk to the blacklisted guest GPU which crashes it. 
+To avoid this, execute this:
+```
+$ sudo X -configure
+$ sudo cp xorg.conf.new /etc/X11/xorg.conf
+```
+
+#### Add HiDPI support to xrandr output switching
+By default, turning a display on via xrandr sets Gnome's HiDPI scale to 100%. Since I prefer 200% scaling I had to run the following commands as fix:
+```
+$ gsettings set org.gnome.settings-daemon.plugins.xsettings overrides "[{'Gdk/WindowScalingFactor', <2>}]"
+$ gsettings set org.gnome.desktop.interface scaling-factor 2
+```
+
+
 ## Credits/Sources
 - Arch Wiki 
   - [(PCI passthrough via OVMF)](https://wiki.archlinux.org/index.php/PCI_passthrough_via_OVMF#With_vfio-pci_built_into_the_kernel)
 - The Passthrough POST 
   - [Explaining CSM, efifb=off, and Setting the Boot GPU Manually](https://passthroughpo.st/explaining-csm-efifboff-setting-boot-gpu-manually/)
   - [Evdev Passthrough Explained — Cheap, Seamless VM Input](https://passthroughpo.st/using-evdev-passthrough-seamless-vm-input/)
+  - [Howto: Libvirt Automation Using VFIO-Tools Hook Helper](https://passthroughpo.st/simple-per-vm-libvirt-hooks-with-the-vfio-tools-hook-helper/)
 - Reddit 
   - [High DPC Latency and Audio Stuttering on Windows 10](https://www.removeddit.com/r/VFIO/comments/6vgtpx/high_dpc_latency_and_audio_stuttering_on_windows/dm0sfto/)
   - [Trouble passing evdev to guest: Could not open /dev/input/by-id/...: Permission denied](https://www.reddit.com/r/VFIO/comments/7iqw6h/trouble_passing_evdev_to_guest_could_not_open/)
