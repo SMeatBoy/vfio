@@ -72,7 +72,7 @@ nvram = [
 #   "/usr/share/AAVMF/AAVMF32_CODE.fd:/usr/share/AAVMF/AAVMF32_VARS.fd",
 #   "/usr/share/OVMF/OVMF_CODE.ms.fd:/usr/share/OVMF/OVMF_VARS.ms.fd"
 ```
-#### Optional: Change user for QEMU 
+#### *Optional: Change user for QEMU *
 This is only needed if evdev passthrough will be used. 
 As I understand it is best practice to execute QEMU as a non-login user created for this purpose. One may also change this value to the own user or root if so preferred. 
 
@@ -87,7 +87,34 @@ Then, edit **etc/libvirt/qemu.conf** once again. The relevant line is around 440
 user = vfio
 ```
 
+## Create and configure the VM
+This can be split into two parts. In the first part a virtual machine will be created with virt-manager. The second part configures the VM to improve performance and (most importantly) work around the well-known *Error 43*.
 
+#### Create VM in virt-manager
+###### Initial VM creation
+Open virt-manager and create a new virtual machine. A window should open. 
+- Step 1: Choose local install media
+- Step 2: Select you install media. You might have to create a storage pool first. In this case choose filesystem directory.
+- Step 3: Select 8144 and 8 for memory and CPU respectively.
+- Step 4: Depending on your setup you can choose to
+  - use the default disk image
+  - create a disk image in a place of your choosing
+  - specify a whole disk as storage location, e.g. /dev/sdb3
+- Step 5: **Important:** Tick *Customize configuration before install*
 
+###### Basic configuration
+A couple of steps need to be done in the new configuration overview window. 
+- Choose the correct firmware in the *Overview* tab. Switch from BIOS to UEFI. The UEFI entry should feature the previously specified nvram path. 
+- Change the CPU configuration in the *CPUs* tab. 
+  - Deselect *Copy host CPU configuration* and set the model to `host-passthrough`. 
+  - Select *Manually set CPU topology*. In this case 1 socket, 4 cores and 2 threads (per core).
+- Change the Disk Bus to VirtIO in the *SATA Disk 1* tab
+- Optional: Remove the *Tablet*, *Display Spice* and *Video QXL* devices. We're doing GPU-passthrough after all. 
+- Really Optional: Remove the *Sound ich9* device. I just can't get guest to host audio passthrough to work. Your mileage may vary. 
+- Add Hardware: Select all devices that you want to use inside your VM.  
+  - Select both Guest GPU devices under PCI Host device
+  - *Optional: Select a USB controller or HD audio device under PCI Host device*
+  - *Optional: Select single USB controller*
+  - *Optional: Select additional storage and/or further devices*
 
 
