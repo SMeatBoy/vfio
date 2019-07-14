@@ -51,7 +51,7 @@ Next, update GRUB and Initramfs to feature all the changes made above by running
 #### Install virtualization packages
 Run `apt install qemu qemu-kvm libvirt0 ovmf virt-manager` to install packages needed for virtualization.
 #### Set path of OVMF firmware
-Edit **etc/libvirt/qemu.conf** and find the commented line that starts with `nvram`. Edit these lines to reflect the path of your OVMF files. 
+Edit **etc/libvirt/qemu.conf** and find the commented line that starts with `nvram`. Edit these lines to reflect the path of your OVMF files. Always restart libvirtd after editing by executing `systemctl restart libvirtd.service`
 ###### Before
 ```
 #nvram = [
@@ -180,3 +180,106 @@ Add a fake vendor_id and hide KVM in the features section.
     </kvm>
   </features>
 ```
+## *Optional: Evdev Passthrough*
+Evdev passthrough works like a virtual USB/KVM switch. Clicking both CTRLs on your keyboard switches your input devices between guest and host. The Passthrough POST has a really [nice tutorial](https://passthroughpo.st/using-evdev-passthrough-seamless-vm-input/) explaining the matter much better.  
+
+I did not end up using it (even though I would have really liked to). Sometimes when switching from guest to host audio in the Windows guest hangs until i disable and enable the audio device (HDMI audio from 980 Ti). Instead I use [Synergy](https://symless.com/synergy) to switch mouse and keyboard between guest and host. 
+
+#### Finding the correct input devices
+Your mouse and keyboard actions (in Linux fashion) are represented as a file under **/dev/input**. Try to find the event files that correspondent to the actual key events by first listing the content of **/dev/input/by-id**.
+###### Example:
+```
+$ ls -l /dev/input/by-id
+
+total 0
+lrwxrwxrwx 1 root root  9 Jul 14 18:28 usb-Logitech_Gaming_Mouse_G502_0C65344F3231-event-if01 -> ../event4
+lrwxrwxrwx 1 root root  9 Jul 14 18:28 usb-Logitech_Gaming_Mouse_G502_0C65344F3231-event-mouse -> ../event2
+lrwxrwxrwx 1 root root  9 Jul 14 18:28 usb-Logitech_Gaming_Mouse_G502_0C65344F3231-if01-event-kbd -> ../event3
+lrwxrwxrwx 1 root root  9 Jul 14 18:28 usb-Logitech_Gaming_Mouse_G502_0C65344F3231-mouse -> ../mouse0
+lrwxrwxrwx 1 root root 10 Jul 14 18:28 usb-Logitech_Logitech_G710_Keyboard-event-if01 -> ../event12
+lrwxrwxrwx 1 root root 10 Jul 14 18:28 usb-Logitech_Logitech_G710_Keyboard-event-kbd -> ../event10
+lrwxrwxrwx 1 root root 10 Jul 14 18:28 usb-Logitech_Logitech_G710_Keyboard-if01-event-kbd -> ../event11
+```
+Then, `cat` devices that sound plausible. In my case all of the above... If the output is random gibberish you have found one of you input devices. Repeat until all devices have been found. Note the event file in /dev/input that the file symlinks to. You will need that path (e.g. /dev/input/event10/) for later configuration
+###### Example:
+```
+$ cat /dev/input/by-id/usb-Logitech_Logitech_G710_Keyboard-event-kbd
+
++]�`d-k+]Pz-k+]Pz -k+]Pz.k+]��.k+]��.k+]��2/k+]�# /k+]�#/k+]�#3/k+]�/k+]�/k+]�/k+]�!/k+]�/k+]�4/k+]�� /k+]��/k+]��/k+]%�!/k+]%�/k+]%�7k+]I<
+```
+#### Add devices to your VM
+Add all devices found the previous step to your VM by editing its XML near the bottom of the file via `virsh edit VM_NAME`. Add `grab_all=on,repeat=on` to your keyboard.
+
+###### Before:
+```
+  </devices>
+</domain>
+```
+###### After:
+```
+  </devices>
+  <qemu:commandline>
+    <qemu:arg value='-object'/>
+    <qemu:arg value='input-linux,id=mouse1,evdev=/dev/input/event2'/>
+    <qemu:arg value='-object'/>
+    <qemu:arg value='input-linux,id=mouse2,evdev=/dev/input/event3'/>
+    <qemu:arg value='-object'/>
+    <qemu:arg value='input-linux,id=kbd1,evdev=/dev/input/event10,grab_all=on,repeat=on'/>
+    <qemu:arg value='-object'/>
+    <qemu:arg value='input-linux,id=kbd2,evdev=/dev/input/event12'/>
+  </qemu:commandline>
+</domain>
+```
+#### Add files to QEMU
+Add the same devices/files to the *cgroup_devices_acl* to your QEMU config in **etc/libvirt/qemu.conf/**
+The relevant section should be around line 480.
+
+###### Before:
+```
+# cgroup_device_acl = [
+#    "/dev/null", "/dev/full", "/dev/zero",
+#    "/dev/random", "/dev/urandom",
+#    "/dev/ptmx", "/dev/kvm", "/dev/kqemu",
+#    "/dev/rtc","/dev/hpet", "/dev/sev"
+#
+# ]
+```
+
+###### After:
+```
+cgroup_device_acl = [
+    "/dev/null", "/dev/full", "/dev/zero",
+    "/dev/random", "/dev/urandom",
+    "/dev/ptmx", "/dev/kvm", "/dev/kqemu",
+    "/dev/rtc","/dev/hpet", "/dev/sev",
+    "/dev/input/event2",
+    "/dev/input/event3",
+    "/dev/input/event10",
+    "/dev/input/event12",
+]
+```
+Restart libvirtd with `systemctl restart libvirtd.service`.
+
+##### Add exceptions to AppArmor
+QEMU won't be able to access these devices if they aren't whitelisted. Therefore you have to add them as exception in **/etc/apparmor.d/abstractions/libvirt-qemu**. Add the following lines and restart AppArmor with `systemctl restart apparmor.service`:
+```
+  /dev/input/event2 rw,
+  /dev/input/event3 rw,
+  /dev/input/event10 rw,
+  /dev/input/event12 rw,
+```
+Finally, add the previously created user *vfio* to the *input* group: `usermod -a -G input vfio`
+
+
+## Credits/Sources
+- Arch Wiki 
+  - [(PCI passthrough via OVMF)](https://wiki.archlinux.org/index.php/PCI_passthrough_via_OVMF#With_vfio-pci_built_into_the_kernel)
+- The Passthrough POST 
+  - [Explaining CSM, efifb=off, and Setting the Boot GPU Manually](https://passthroughpo.st/explaining-csm-efifboff-setting-boot-gpu-manually/)
+  - [Evdev Passthrough Explained — Cheap, Seamless VM Input](https://passthroughpo.st/using-evdev-passthrough-seamless-vm-input/)
+- Reddit 
+  - [High DPC Latency and Audio Stuttering on Windows 10](https://www.removeddit.com/r/VFIO/comments/6vgtpx/high_dpc_latency_and_audio_stuttering_on_windows/dm0sfto/)
+  - [Trouble passing evdev to guest: Could not open /dev/input/by-id/...: Permission denied](https://www.reddit.com/r/VFIO/comments/7iqw6h/trouble_passing_evdev_to_guest_could_not_open/)
+- Level1Techs 
+  - [Windows 10 1803 as guest with QEMU/KVM, BSOD under install](https://forum.level1techs.com/t/windows-10-1803-as-guest-with-qemu-kvm-bsod-under-install/127425/13)
+- Many more that I sadly can't remember
