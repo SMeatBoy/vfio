@@ -262,6 +262,24 @@ Add all devices found the previous step to your VM by editing its XML near the b
   </qemu:commandline>
 </domain>
 ```
+For better performance you can add mouse and keyboard as VirtIO devices. This requires you to install the vioinput drivers from the virtio-win driver package used during Windows installation. 
+
+###### Before:
+```
+    <input type='mouse' bus='ps2'/>
+    <input type='keyboard' bus='ps2'/>
+```
+###### After:
+```
+    <input type='mouse' bus='virtio'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x0e' function='0x0'/>
+    </input>
+    <input type='keyboard' bus='virtio'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x0f' function='0x0'/>
+    </input>
+    <input type='mouse' bus='ps2'/>
+    <input type='keyboard' bus='ps2'/>
+```
 #### Add files to QEMU
 Add the same devices/files to the *cgroup_devices_acl* to your QEMU config in **etc/libvirt/qemu.conf/**
 The relevant section should be around line 480.
@@ -301,7 +319,6 @@ QEMU won't be able to access these devices if they aren't whitelisted. Therefore
   /dev/input/event12 rw,
 ```
 Finally, add the previously created user *vfio* to the *input* group: `usermod -a -G input vfio`
-
 
 ## Credits/Sources
 - Arch Wiki 
