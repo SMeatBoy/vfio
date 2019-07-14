@@ -138,6 +138,7 @@ A couple of steps need to be done in the new configuration overview window.
 - Really Optional: Remove the *Sound ich9* device. I just can't get guest to host audio passthrough to work. Your mileage may vary. 
 - Add Hardware: Select all devices that you want to use inside your VM.  
   - Select both Guest GPU devices under PCI Host device
+  - Add a CDROM containing the VirtIO drivers that can be downloaded from [here](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.141-1/)
   - *Optional: Select a USB controller or HD audio device under PCI Host device*
   - *Optional: Select single USB controller*
   - *Optional: Select additional storage and/or further devices. Just remember that you need some kind of input device to install windows if you aren't using evdev passthrough.*
@@ -205,6 +206,12 @@ Add a fake vendor_id and hide KVM in the features section.
     </kvm>
   </features>
 ```
+## Installing Windows
+Now you are finally ready to start the VM and install Windows. If you get stuck in the BIOS/UEFI, type exit and select the Windows CD in the Boot Manager. 
+
+Windows won't recognize the VirtIO disk until install the drivers. Load drivers from the CD's viosci/win10/amd64 and vstor/win10/amd64 folder. 
+
+
 ## *Optional: Evdev Passthrough*
 Evdev passthrough works like a virtual USB/KVM switch. Clicking both CTRLs on your keyboard switches your input devices between guest and host. The Passthrough POST has a really [nice tutorial](https://passthroughpo.st/using-evdev-passthrough-seamless-vm-input/) explaining the matter much better.  
 
