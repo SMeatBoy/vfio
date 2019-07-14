@@ -117,4 +117,5 @@ A couple of steps need to be done in the new configuration overview window.
   - *Optional: Select single USB controller*
   - *Optional: Select additional storage and/or further devices*
 
+Hit *Begin Installation* once you configured the VM to your liking.
 
