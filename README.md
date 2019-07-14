@@ -11,12 +11,11 @@ This document describes how to recreate my personal VFIO setup.
 ## Prerequesites
 #### Set Kernel Parameters 
 Edit **/etc/default/grub**
-
-Before:
+###### Before:
 ```
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
 ```
-After:
+###### After:
 ```
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash amd_iommu=on iommpu=pt video=efifb:off vfio-pci.ids=10de:17c8,10de:0fb0 isolcpus=8-15 nohz_full=8-15 rcu_nocbs=8-15"
 ```
@@ -45,3 +44,50 @@ vfio
 vfio_iommu_type1
 vfio_virqfd
 ```
+#### Update GRUB and Initramfs
+Next, update GRUB and Initramfs to feature all the changes made above by running `update grub && update-initramfs -u`
+
+## Set up QEMU
+#### Install virtualization packages
+Run `apt install qemu qemu-kvm libvirt0 ovmf virt-manager` to install packages needed for virtualization.
+#### Set path of OVMF firmware
+Edit **etc/libvirt/qemu.conf** and find the commented line that starts with `nvram`. Edit these lines to reflect the path of your OVMF files. 
+###### Before
+```
+#nvram = [
+#   "/usr/share/OVMF/OVMF_CODE.fd:/usr/share/OVMF/OVMF_VARS.fd",
+#   "/usr/share/OVMF/OVMF_CODE.secboot.fd:/usr/share/OVMF/OVMF_VARS.fd",
+#   "/usr/share/AAVMF/AAVMF_CODE.fd:/usr/share/AAVMF/AAVMF_VARS.fd",
+#   "/usr/share/AAVMF/AAVMF32_CODE.fd:/usr/share/AAVMF/AAVMF32_VARS.fd",
+#   "/usr/share/OVMF/OVMF_CODE.ms.fd:/usr/share/OVMF/OVMF_VARS.ms.fd"
+#]
+```
+###### After
+```
+nvram = [
+   "/usr/share/OVMF/OVMF_CODE.fd:/usr/share/OVMF/OVMF_VARS.fd",
+]
+#   "/usr/share/OVMF/OVMF_CODE.secboot.fd:/usr/share/OVMF/OVMF_VARS.fd",
+#   "/usr/share/AAVMF/AAVMF_CODE.fd:/usr/share/AAVMF/AAVMF_VARS.fd",
+#   "/usr/share/AAVMF/AAVMF32_CODE.fd:/usr/share/AAVMF/AAVMF32_VARS.fd",
+#   "/usr/share/OVMF/OVMF_CODE.ms.fd:/usr/share/OVMF/OVMF_VARS.ms.fd"
+```
+#### Optional: Change user for QEMU 
+This is only needed if evdev passthrough will be used. 
+As I understand it is best practice to execute QEMU as a non-login user created for this purpose. One may also change this value to the own user or root if so preferred. 
+
+First, create a new user by executing `useradd -s /usr/sbin/nologin -r -M -d /dev/null vfio`. 
+Then, edit **etc/libvirt/qemu.conf** once again. The relevant line is around 440.
+###### Before:
+```
+#user = root 
+```
+###### After:
+```
+user = vfio
+```
+
+
+
+
+
