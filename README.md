@@ -21,11 +21,22 @@ This guide describes how to create my personal VFIO setup.
     - [XML Namespace](https://github.com/SMeatBoy/vfio/blob/master/README.md#xml-namespace)
     - [CPU configuration](https://github.com/SMeatBoy/vfio/blob/master/README.md#cpu-configuration)
     - [Fix Error 43](https://github.com/SMeatBoy/vfio/blob/master/README.md#fix-error-43)
+  - [Installing Windows](https://github.com/SMeatBoy/vfio/blob/master/README.md#installing-windows)
 - [*Optional: Evdev Passthrough*](https://github.com/SMeatBoy/vfio/blob/master/README.md#optional-evdev-passthrough)
   - [Finding the correct input devices](https://github.com/SMeatBoy/vfio/blob/master/README.md#finding-the-correct-input-devices)
   - [Add devices to your VM](https://github.com/SMeatBoy/vfio/blob/master/README.md#add-devices-to-your-vm)
   - [Add files to QEMU](https://github.com/SMeatBoy/vfio/blob/master/README.md#add-files-to-qemu)
+  - [Add exceptions to AppArmor](https://github.com/SMeatBoy/vfio/blob/master/README.md)
+- [*Optional: Execute Scripts on VM Startup and Shutdown*](https://github.com/SMeatBoy/vfio/blob/master/README.md#optional-execute-scripts-on-vm-startup-and-shutdown)
+  - [Setup](https://github.com/SMeatBoy/vfio/blob/master/README.md#setup)
+  - [Exemplary Hooks](https://github.com/SMeatBoy/vfio/blob/master/README.md#exemplary-hooks)
+- [*Optional: Add Synergy as Systemd Service*](https://github.com/SMeatBoy/vfio/blob/master/README.md#optional-add-synergy-as-systemd-service)
+- [*Optional: Configure X and Gnome*](https://github.com/SMeatBoy/vfio/blob/master/README.md#optional-configure-x-and-gnome)
+  - [Avoid Login Loop](https://github.com/SMeatBoy/vfio/blob/master/README.md#avoid-login-loop)
+  - [Add HiDPI support to xrandr output switching](https://github.com/SMeatBoy/vfio/blob/master/README.md#add-hidpi-support-to-xrandr-output-switching)
 - [Credits/Sources](https://github.com/SMeatBoy/vfio/blob/master/README.md#creditssources)
+
+
 ## Hardware
 - CPU: Ryzen 7 1700
 - Motherboard: ASUS ROG STRIX X370-F GAMING
@@ -34,7 +45,7 @@ This guide describes how to create my personal VFIO setup.
 - Guest GPU: GTX 980 Ti
 
 ## System Configuration
-#### Set Kernel Parameters 
+### Set Kernel Parameters 
 Edit **/etc/default/grub**
 ###### Before:
 ```
@@ -51,7 +62,7 @@ GRUB_CMDLINE_LINUX_DEFAULT="quiet splash amd_iommu=on iommpu=pt video=efifb:off 
 - `isolcpus=8-15`: Isolates and pins CPU cores so that they are exclusively used by the guest OS. **Caution:** Disables host OS to use these CPU cores
 - `nohz_full=8-15` and `rcu_nocbs=8-15`: Removes microstutters in the guest OS. I don't know exactly why this works. See [this old Reddit post](https://www.removeddit.com/r/VFIO/comments/6vgtpx/high_dpc_latency_and_audio_stuttering_on_windows/dm0sfto/)
 
-#### Blacklist GPU to prevent driver loading
+### Blacklist GPU to prevent driver loading
 Create **/etc/modprobe.d/vfio.conf** and add these parameters:
 
 ```
@@ -61,7 +72,7 @@ Create **/etc/modprobe.d/vfio.conf** and add these parameters:
 - `options vfio-pci ids=10de:17c8,10de:0fb0`: Further blacklisting of guest GPU
 - `options kvm ignore_msrs=1`: Windows will not boot without this. See [this post on the Level1Techs forum](https://forum.level1techs.com/t/windows-10-1803-as-guest-with-qemu-kvm-bsod-under-install/127425/13)
 
-#### Load VFIO kernel modules
+### Load VFIO kernel modules
 Edit **/etc/initramfs-tools/modules** and append these parameters:
 ```
 vfio_pci
@@ -69,13 +80,13 @@ vfio
 vfio_iommu_type1
 vfio_virqfd
 ```
-#### Update GRUB and Initramfs
+### Update GRUB and Initramfs
 Next, update GRUB and Initramfs to feature all the changes made above by running `update grub && update-initramfs -u`
 
 ## Set up QEMU
-#### Install virtualization packages
+### Install virtualization packages
 Run `apt install qemu qemu-kvm libvirt0 ovmf virt-manager` to install packages needed for virtualization.
-#### Set path of OVMF firmware
+### Set path of OVMF firmware
 Edit **etc/libvirt/qemu.conf** and find the commented line that starts with `nvram`. Edit these lines to reflect the path of your OVMF files. Always restart libvirtd after editing by executing `systemctl restart libvirtd.service`
 ###### Before
 ```
@@ -97,7 +108,7 @@ nvram = [
 #   "/usr/share/AAVMF/AAVMF32_CODE.fd:/usr/share/AAVMF/AAVMF32_VARS.fd",
 #   "/usr/share/OVMF/OVMF_CODE.ms.fd:/usr/share/OVMF/OVMF_VARS.ms.fd"
 ```
-#### Optional: Change user for QEMU
+### Optional: Change user for QEMU
 This is only needed if evdev passthrough will be used. 
 As I understand it is best practice to execute QEMU as a non-login user created for this purpose. One may also change this value to the own user or root if so preferred. 
 
@@ -115,8 +126,8 @@ user = vfio
 ## Create and configure the VM
 This can be split into two parts. In the first part a virtual machine will be created with virt-manager. The second part configures the VM to improve performance and (most importantly) work around the well-known *Error 43*.
 
-#### Create VM in virt-manager
-##### Initial VM creation
+### Create VM in virt-manager
+#### Initial VM creation
 Open virt-manager and create a new virtual machine. A window should open. 
 - Step 1: Choose local install media
 - Step 2: Select you install media. You might have to create a storage pool first. In this case choose filesystem directory.
@@ -127,7 +138,7 @@ Open virt-manager and create a new virtual machine. A window should open.
   - specify a whole disk as storage location, e.g. /dev/sdb3
 - Step 5: **Important:** Tick *Customize configuration before install*
 
-##### Basic configuration
+#### Basic configuration
 A couple of steps need to be done in the new configuration overview window. 
 - Choose the correct firmware in the *Overview* tab. Switch from BIOS to UEFI. The UEFI entry should feature the previously specified nvram path. 
 - Change the CPU configuration in the *CPUs* tab. 
@@ -145,16 +156,16 @@ A couple of steps need to be done in the new configuration overview window.
 
 Hit *Begin Installation* once you configured the VM to your liking. Kill the VM before installing windows since your new VM is not fully configured. 
 
-#### Advanced configuration with virsh
+### Advanced configuration with virsh
 The following steps are performed inside the VM's XML file. 
 Edit by executing `virsh edit VM_NAME`.
-##### XML Namespace
+#### XML Namespace
 Declare the XML namespace in the first line
 ###### Before:
 ```<domain type='kvm'>```
 ###### After:
 ```<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>```
-##### CPU configuration
+#### CPU configuration
 Change the CPU configuration to reflect the isolated cpu cores and number of cores of your VM. 
 ###### Before:
 ```
@@ -206,7 +217,7 @@ Add a fake vendor_id and hide KVM in the features section.
     </kvm>
   </features>
 ```
-## Installing Windows
+### Installing Windows
 Now you are finally ready to start the VM and install Windows. If you get stuck in the BIOS/UEFI, type exit and select the Windows CD in the Boot Manager. 
 
 Windows won't recognize the VirtIO disk until install the drivers. Load drivers from the CD's viosci/win10/amd64 and vstor/win10/amd64 folder. 
@@ -217,7 +228,7 @@ Evdev passthrough works like a virtual USB/KVM switch. Clicking both CTRLs on yo
 
 I did not end up using it (even though I would have really liked to). Sometimes when switching from guest to host audio in the Windows guest hangs until i disable and enable the audio device (HDMI audio from 980 Ti). Instead I use [Synergy](https://symless.com/synergy) to switch mouse and keyboard between guest and host. 
 
-#### Finding the correct input devices
+### Finding the correct input devices
 Your mouse and keyboard actions (in Linux fashion) are represented as a file under **/dev/input**. Try to find the event files that correspondent to the actual key events by first listing the content of **/dev/input/by-id**.
 ###### Example:
 ```
@@ -239,7 +250,7 @@ $ cat /dev/input/by-id/usb-Logitech_Logitech_G710_Keyboard-event-kbd
 
 +]�`d-k+]Pz-k+]Pz -k+]Pz.k+]��.k+]��.k+]��2/k+]�# /k+]�#/k+]�#3/k+]�/k+]�/k+]�/k+]�!/k+]�/k+]�4/k+]�� /k+]��/k+]��/k+]%�!/k+]%�/k+]%�7k+]I<
 ```
-#### Add devices to your VM
+### Add devices to your VM
 Add all devices found the previous step to your VM by editing its XML near the bottom of the file via `virsh edit VM_NAME`. Add `grab_all=on,repeat=on` to your keyboard.
 
 ###### Before:
@@ -280,7 +291,7 @@ For better performance you can add mouse and keyboard as VirtIO devices. This re
     <input type='mouse' bus='ps2'/>
     <input type='keyboard' bus='ps2'/>
 ```
-#### Add files to QEMU
+### Add files to QEMU
 Add the same devices/files to the *cgroup_devices_acl* to your QEMU config in **etc/libvirt/qemu.conf/**
 The relevant section should be around line 480.
 
@@ -310,7 +321,7 @@ cgroup_device_acl = [
 ```
 Restart libvirtd with `systemctl restart libvirtd.service`.
 
-#### Add exceptions to AppArmor
+### Add exceptions to AppArmor
 QEMU won't be able to access these devices if they aren't whitelisted. Therefore you have to add them as exception in **/etc/apparmor.d/abstractions/libvirt-qemu**. Add the following lines and restart AppArmor with `systemctl restart apparmor.service`:
 ```
   /dev/input/event2 rw,
@@ -322,7 +333,7 @@ Finally, add the previously created user *vfio* to the *input* group: `usermod -
 
 ## *Optional: Execute Scripts on VM Startup and Shutdown*
 It is possible to [hook scripts](https://passthroughpo.st/simple-per-vm-libvirt-hooks-with-the-vfio-tools-hook-helper/) to the startup and shutdown of your virtual machine. For example, I want to disconnect my second screen from gnome and start synergy. 
-#### Setup
+### Setup
 Execute the following:
 ```
 $ sudo mkdir -p /etc/libvirt/hooks
@@ -363,7 +374,7 @@ WantedBy=multi-user.target
 
 ## *Optional: Configure X and Gnome*
 
-#### Avoid Login Loop
+### Avoid Login Loop
 I have to reconfigure X after starting the VM for the first time. Otherwise I am stuck in a login loop after rebooting Ubuntu. I guess that X wants to talk to the blacklisted guest GPU which crashes it. 
 To avoid this, execute this:
 ```
@@ -371,7 +382,7 @@ $ sudo X -configure
 $ sudo cp xorg.conf.new /etc/X11/xorg.conf
 ```
 
-#### Add HiDPI support to xrandr output switching
+### Add HiDPI support to xrandr output switching
 By default, turning a display on via xrandr sets Gnome's HiDPI scale to 100%. Since I prefer 200% scaling I had to run the following commands as fix:
 ```
 $ gsettings set org.gnome.settings-daemon.plugins.xsettings overrides "[{'Gdk/WindowScalingFactor', <2>}]"
