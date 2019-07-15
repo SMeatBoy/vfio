@@ -343,7 +343,7 @@ systemctl start synergy@bastian.service
 **/etc/libvirt/hooks/qemu.d/win10/stopped/end/shutdown.sh**
 ```
 #!/bin/bash
-su - bastian -c "xrandr --output DisplayPort-1 --auto --output HDMI-A-1 --auto --right-of DisplayPort-1"
+su - bastian -c "DISPLAY=:0.0 xrandr --output DisplayPort-1 --auto --output HDMI-A-1 --auto --right-of DisplayPort-1"
 systemctl stop synergy@bastian.service
 ```
 ## *Optional: Add Synergy as Systemd Service*
