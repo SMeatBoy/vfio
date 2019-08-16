@@ -1,6 +1,6 @@
 # Yet Another VFIO Guide
 
-This guide describes how to create my personal VFIO setup.
+This guide describes how to create my personal VFIO setup on Ubuntu 19.04.
 
 ## Table of Contents
 - [Hardware](https://github.com/SMeatBoy/vfio/blob/master/README.md#hardware)
